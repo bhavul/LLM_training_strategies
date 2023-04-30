@@ -35,6 +35,11 @@ This repository will serve as an index detailing various strategies, tweaks, and
 - Data Parallelism (e.g. PyTorch FSDP and DDP, ZERO sharding strategy): Splitting the input data across multiple GPUs to allow for larger batch sizes.
 - Pipeline Parallelism: Splitting the model into several stages that are each run on different GPUs, allowing for larger models and better hardware utilization.
 
+## Fine-tuning Approaches
+
+- P-tuning: A method of parameter efficient fine-tuning where additional positional parameters are introduced and learned.
+- Adapter Tuning: A method of fine-tuning where additional, smaller layers (adapters) are added to the model and trained, while the original model parameters are frozen.
+
 
 ### Contributions
 
