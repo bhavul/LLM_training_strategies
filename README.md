@@ -4,6 +4,7 @@ Over the last few months as I've been reading up on LLMs, I have realised that d
 
 This repository will serve as an index detailing various strategies, tweaks, and recent architectural or hyperparameter choices made by different large language models. 
 
+# Strategies, tweaks, and techniques
 
 ## Data Preparation Strategies
 
@@ -24,13 +25,25 @@ This repository will serve as an index detailing various strategies, tweaks, and
 - Unpadding: A technique to reduce the computational cost of training by removing unnecessary padding tokens.
 - Knowledge Distillation: Training a smaller student model to imitate the behavior of a larger teacher model.
 
+## Pre-training Tasks
+
+- Token Masking: Token deletion or masking is the most common strategy. In autoregressive models like GPT, it masks next token, while in encoder-decoder models like BERT it randomly masks some percentage of tokens (MLM).
+- Next Sentence Prediction (NSP) : the model is given two sentences and must predict whether the second sentence follows the first in the original document
+- Text infilling : parts of the text are removed, and the model is tasked with filling in the missing parts
+- Sentence permutation : another form of sequence corruption where the sentences in a document are permuted, and the model is tasked with sorting them back into the original order
+- Document Rotation :the document is rotated, and the model's task is to understand the correct ordering of the document
+
+## Hyperparameter Choices
+
+- TBA
+
 ## Optimization Strategies
 
 - AdamW Optimizer: A variant of the Adam optimizer that decouples weight decay from the rest of the optimization algorithm.
 - Gradient Clipping: A method to prevent gradients from becoming too large and causing numerical instability during training.
 
-
 ## Parallelism Strategies 
+
 - Tensor Parallelism: Splitting the model's parameters across multiple GPUs to allow for larger models.
 - Data Parallelism (e.g. PyTorch FSDP and DDP, ZERO sharding strategy): Splitting the input data across multiple GPUs to allow for larger batch sizes.
 - Pipeline Parallelism: Splitting the model into several stages that are each run on different GPUs, allowing for larger models and better hardware utilization.
@@ -41,6 +54,6 @@ This repository will serve as an index detailing various strategies, tweaks, and
 - Adapter Tuning: A method of fine-tuning where additional, smaller layers (adapters) are added to the model and trained, while the original model parameters are frozen.
 
 
-### Contributions
+## Contributions
 
 Contributions are welcome. 
