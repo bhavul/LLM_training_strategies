@@ -390,21 +390,6 @@ Discuss:
 11. **IFEval**
 12. **Length-Controlled AlpacaEval**
 
-# Practical Preparation Advice
-
-For every major topic, the candidate should be able to discuss:
-
-* One training recipe.
-* One important failure mode.
-* One debugging methodology.
-* One systems constraint.
-* One unresolved research question.
-
-A strong senior or staff-level answer should usually move through:
-
-**objective → available data → training method → infrastructure → measurements → likely failures → experiment design → decision criteria**
-
-The goal is not to memorise every recent acronym. It is to show that you can reason about how an entire post-training programme should be designed and improved.
 
 
 
