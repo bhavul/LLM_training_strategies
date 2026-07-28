@@ -1,57 +1,411 @@
 # Large Language Models Training Strategies
 
-Over the last few months as I've been reading up on LLMs, I have realised that deep within the actual papers lie some great advice on training strategies, tweaks made to data, choice of hyperparamters and such which get lost in the noise of hype. 
+Over the last few months as I've been reading up on LLMs, I thought of collecting a list of questions which are useful to probe you to think about importance and usefulness of each topic (mostly post-training oriented). This also has a few study resources listed. 
 
-This repository will serve as an index detailing various strategies, tweaks, and recent architectural or hyperparameter choices made by different large language models. 
+# LLM Post-Training
 
-# Strategies, tweaks, and techniques
+# 1. SFT and Instruction Tuning
 
-## Data Preparation Strategies
+## Q1. You are given a strong base model and a fixed post-training compute budget. How would you design its SFT stage?
 
-- MinHashLSH with Jaccard Similarity for De-duplicating Dataset
-- Dataset Distillation: A process where a smaller 'student' dataset is created that can be used to train a model to similar performance as the original 'teacher' dataset.
-- Dynamic Mixing: Mixing data from different datasets or domains at different ratios during training.
+Discuss how you would:
 
-## Model Architectural Choices
+* Translate product goals into a capability taxonomy.
+* Construct the mixture across reasoning, coding, instruction following, conversations, multilinguality, safety, and tool use.
+* Decide which data should be human-written, model-generated, or execution-verified.
+* Determine when the checkpoint is ready for preference optimisation or RL.
 
-- Transformer Architecture: The fundamental building block of most modern LLMs, consisting of self-attention and feed-forward layers.
-- Sparse and Dense Attention Layers in Alternation: A combination of sparse attention (for computational efficiency) and dense attention (for representational power).
-- Flash Attention Layer: A method to increase the efficiency of attention mechanisms.
-- Rotary Embeddings for Positional Embeddings: A new technique that injects positional information more effectively into transformer models.
-- LayerNorm: A type of normalization technique often used in transformer models to stabilize the inputs to each layer.
+### Study
 
-## Training Strategies
+* **The Llama 3 Herd of Models** — post-training data, rejection sampling, capability-specific data.
+* **Tulu 3: Pushing Frontiers in Open Language Model Post-Training** — SFT mixture, evaluation framework, reproducible training recipe.
 
-- Unpadding: A technique to reduce the computational cost of training by removing unnecessary padding tokens.
-- Knowledge Distillation: Training a smaller student model to imitate the behavior of a larger teacher model.
+---
 
-## Pre-training Tasks
+## Q2. Design a synthetic SFT data factory capable of producing millions of useful examples.
 
-- Token Masking: Token deletion or masking is the most common strategy. In autoregressive models like GPT, it masks next token, while in encoder-decoder models like BERT it randomly masks some percentage of tokens (MLM).
-- Next Sentence Prediction (NSP) : the model is given two sentences and must predict whether the second sentence follows the first in the original document
-- Text infilling : parts of the text are removed, and the model is tasked with filling in the missing parts
-- Sentence permutation : another form of sequence corruption where the sentences in a document are permuted, and the model is tasked with sorting them back into the original order
-- Document Rotation :the document is rotated, and the model's task is to understand the correct ordering of the document
+Your design should cover prompt creation, teacher generation, filtering, deduplication, difficulty control, and evaluation.
 
-## Hyperparameter Choices
+### Follow-up questions
 
-- TBA
+* How would you prevent the student from merely copying the teacher’s verbosity and stylistic biases?
+* How would you measure the marginal value of generating another million examples?
 
-## Optimization Strategies
+### Study
 
-- AdamW Optimizer: A variant of the Adam optimizer that decouples weight decay from the rest of the optimization algorithm.
-- Gradient Clipping: A method to prevent gradients from becoming too large and causing numerical instability during training.
+* **Self-Instruct: Aligning Language Models with Self-Generated Instructions.**
+* **The Llama 3 Herd of Models** — iterative rejection sampling and synthetic-data pipelines.
+* **Topics:** Persona-driven prompting, topic trees, execution filtering, embedding-based diversity and student-aware generation.
 
-## Parallelism Strategies 
+---
 
-- Tensor Parallelism: Splitting the model's parameters across multiple GPUs to allow for larger models.
-- Data Parallelism (e.g. PyTorch FSDP and DDP, ZERO sharding strategy): Splitting the input data across multiple GPUs to allow for larger batch sizes.
-- Pipeline Parallelism: Splitting the model into several stages that are each run on different GPUs, allowing for larger models and better hardware utilization.
+## Q3. An SFT checkpoint improves instruction following but becomes more verbose, less factual, and worse at coding. How would you investigate?
 
-## Fine-tuning Approaches
+Consider:
 
-- P-tuning: A method of parameter efficient fine-tuning where additional positional parameters are introduced and learned.
-- Adapter Tuning: A method of fine-tuning where additional, smaller layers (adapters) are added to the model and trained, while the original model parameters are frozen.
+* Data-mixture errors.
+* Chat-template or loss-masking bugs.
+* Sequence-length and packing effects.
+* Catastrophic forgetting.
+* Evaluation artefacts.
+* Over-representation of synthetic teacher styles.
+
+### Study
+
+* **Tulu 3** — mixture ablations, unseen evaluations and decontamination.
+* **Topics:** Per-source validation loss, data attribution, gradient conflict, length-conditioned evaluation and checkpoint interpolation.
+
+---
+
+# 2. Preference Optimisation
+
+## Q1. How would you choose among SFT, DPO, IPO, KTO, SimPO, ORPO and online preference optimisation?
+
+Base the decision on:
+
+* Whether the available data contains demonstrations, pairs, rankings, scores or binary feedback.
+* Whether the data is offline or generated by the current policy.
+* The degree of distribution shift expected during training.
+* Memory, compute and implementation constraints.
+* Whether calibration or reward overoptimisation is a major concern.
+
+### Study
+
+* **Direct Preference Optimization: Your Language Model Is Secretly a Reward Model.**
+* **KTO: Model Alignment as Prospect Theoretic Optimization.**
+* **SimPO: Simple Preference Optimization with a Reference-Free Reward.**
+
+---
+
+## Q2. DPO preference accuracy improves, but chosen-response likelihood and downstream reasoning performance fall. What might be happening?
+
+Discuss:
+
+* Likelihood displacement.
+* Excessive preference margins.
+* Length exploitation.
+* Overconfidence.
+* Preference-data coverage.
+* The difference between ranking responses correctly and generating good responses.
+
+### Follow-up questions
+
+* Which training curves would you inspect beyond aggregate DPO loss?
+* Would you first change beta, the dataset, or the objective?
+
+### Study
+
+* **Direct Preference Optimization.**
+* **A General Theoretical Paradigm to Understand Learning from Human Preferences**, associated with IPO.
+* **Topics:** Chosen and rejected log-probabilities, calibration, reward-gap saturation and conservative preference objectives.
+
+---
+
+## Q3. Design an iterative preference-learning flywheel using real model interactions.
+
+Explain how you would:
+
+* Sample informative prompts and response pairs.
+* Identify uncertain or disagreement-heavy examples.
+* Combine human and AI feedback.
+* Update the policy without repeatedly training on stale generations.
+* Prevent privacy violations and feedback-loop amplification.
+* Evaluate each iteration against a fixed reference set.
+
+### Study
+
+* Research on **iterative DPO**, **online RLHF** and active preference learning.
+* **Topics:** On-policy data collection, uncertainty sampling, annotator disagreement, implicit feedback and policy–data co-evolution.
+
+---
+
+# 3. RLVR and Reasoning RL
+
+## Q1. Design an RLVR programme for improving mathematics, coding and scientific reasoning.
+
+Your answer should cover:
+
+* Prompt sourcing and difficulty control.
+* Verifier design.
+* Cold-start data.
+* Rollout sampling.
+* Group construction.
+* Reward sparsity.
+* Evaluation beyond pass@1.
+
+### Study
+
+* **DeepSeek-R1: Incentivizing Reasoning Capability in LLMs via Reinforcement Learning.**
+* **Tulu 3** — reinforcement learning with verifiable rewards.
+* **Topics:** Exact-match rewards, unit-test verification, difficulty curricula and zero-variance prompt groups.
+
+---
+
+## Q2. Compare PPO, GRPO, Dr. GRPO and DAPO for reasoning-model training.
+
+Discuss them in terms of:
+
+* Advantage estimation.
+* Bias and variance.
+* Critic requirements.
+* Memory and systems cost.
+* Token-level versus response-level normalisation.
+* Clipping behaviour.
+* Long-response bias.
+* Exploration.
+
+### Follow-up questions
+
+* Which apparent improvements are objective changes, and which are primarily recipe or infrastructure improvements?
+* How would you isolate their contributions experimentally?
+
+### Study
+
+* **DeepSeek-R1** — GRPO.
+* **DAPO: An Open-Source LLM Reinforcement Learning System at Scale.**
+* **Topics:** Group-relative baselines, clip-higher, dynamic sampling and token-level policy gradients.
+
+---
+
+## Q3. Does RLVR create new reasoning abilities, or mainly increase the probability of reasoning paths already present in the base model?
+
+Describe an experiment that distinguishes:
+
+* Capability acquisition.
+* Capability elicitation.
+* Memorisation.
+* Reduced output diversity.
+* Redistribution of probability mass.
+
+Explain why pass@1 alone is insufficient.
+
+### Study
+
+* **Does Reinforcement Learning Really Incentivize Reasoning Capacity in LLMs Beyond the Base Model?**
+* **DeepSeek-R1** — comparisons between direct RL and reasoning distillation.
+* **Topics:** Pass@k, support expansion, trajectory diversity, problem coverage and base-model capability ceilings.
+
+---
+
+# 4. Midtraining and Data Mixtures
+
+## Q1. When should a team use continued pretraining rather than SFT, retrieval, prompting or tool use?
+
+Consider whether the requirement involves:
+
+* Acquiring new domain knowledge.
+* Adapting to a new language or vocabulary.
+* Learning long-form structures.
+* Improving reasoning foundations.
+* Changing behaviour rather than knowledge.
+* Frequently changing information better handled through retrieval.
+
+### Study
+
+* **The Llama 3 Herd of Models** — specialised training and long-context adaptation.
+* **Topics:** Parametric versus retrieved knowledge, domain adaptation and catastrophic forgetting.
+
+---
+
+## Q2. How would you search for an effective midtraining data mixture without testing every mixture at full scale?
+
+Explain:
+
+* How domains would be defined.
+* How proxy models would be used.
+* Which validation distributions would matter.
+* What may or may not transfer from small models to frontier scale.
+* Whether mixture weights should remain static throughout training.
+
+### Follow-up questions
+
+* How would you distinguish a useful domain from one that merely has high loss?
+* What evidence would make you distrust the mixture selected by proxy models?
+
+### Study
+
+* **DoReMi: Optimizing Data Mixtures Speeds Up Language Model Pretraining.**
+* **CMR Scaling Law: Predicting Critical Mixture Ratios for Continual Pre-training of Language Models.**
+* **Topics:** Excess loss, group distributionally robust optimisation, replay ratios and proxy-to-target transfer.
+
+---
+
+## Q3. Design a training stage that extends a model to reliable 128K or longer-context use.
+
+Cover:
+
+* RoPE or positional-encoding changes.
+* Sequence-length curriculum.
+* Short- and long-document mixture.
+* Packing and document boundaries.
+* Compute implications.
+* Long-context retrieval and reasoning evaluations.
+* Short-context regressions.
+
+### Study
+
+* **YaRN: Efficient Context Window Extension of Large Language Models.**
+* **How to Train Long-Context Language Models Effectively.**
+* **Topics:** Position interpolation, context utilisation, long-document construction and needle-versus-reasoning evaluations.
+
+---
+
+# 5. Model Merging and Model Soups
+
+## Q1. When is merging specialised checkpoints technically justified instead of running joint multitask training?
+
+Discuss:
+
+* Shared initialisation and architecture requirements.
+* Full fine-tunes versus LoRA adapters.
+* Linear mode connectivity.
+* Availability of original training data.
+* Serving and retraining costs.
+* When routing or ensembling would be safer.
+
+### Study
+
+* **Model Soups: Averaging Weights of Multiple Fine-Tuned Models Improves Accuracy Without Increasing Inference Time.**
+* **Editing Models with Task Arithmetic.**
+* **Topics:** Shared loss basins, task vectors, checkpoint compatibility and adapter composition.
+
+---
+
+## Q2. How would you predict whether two checkpoints will interfere before evaluating every possible merge?
+
+Consider:
+
+* Task-vector norms.
+* Cosine similarity.
+* Parameter-sign disagreement.
+* Layer-wise similarity.
+* Capability overlap.
+* Whether training can be made merge-aware.
+
+### Study
+
+* **TIES-Merging: Resolving Interference When Merging Models.**
+* **Editing Models with Task Arithmetic.**
+* **Topics:** Sign interference, sparsification, dominant-sign selection and layer-wise merging.
+
+---
+
+## Q3. Design a rigorous experiment comparing weight averaging, task arithmetic, TIES, DARE and joint multitask training.
+
+### Follow-up questions
+
+* What baselines are necessary to show that merging adds value beyond selecting the best individual checkpoint?
+* How would you tune merge coefficients without overfitting to the final evaluation set?
+
+### Study
+
+* **TIES-Merging.**
+* **MergeBench: A Benchmark for Merging Domain-Specialized LLMs.**
+* **Topics:** Coefficient search, worst-capability regression, calibration, heterogeneous experts and serving consolidation.
+
+---
+
+# 6. Post-Training Evaluation and Regression Testing
+
+## Q1. Design the evaluation stack for a frontier post-training programme.
+
+Separate it into:
+
+* Fast inner-loop evaluations.
+* Per-checkpoint regression tests.
+* Comprehensive milestone evaluations.
+* Hidden or unseen evaluations.
+* Human preference testing.
+* Safety and adversarial evaluations.
+* Online launch metrics.
+
+Explain which results should block a training run or release.
+
+### Study
+
+* **Tulu 3** — development and unseen evaluation suites.
+* **IFEval: Instruction-Following Evaluation for Large Language Models.**
+* **Topics:** Evaluation tiers, release gates, capability floors, paired comparisons and statistical power.
+
+---
+
+## Q2. How would you detect and manage benchmark contamination?
+
+Your answer should distinguish:
+
+* Exact-match contamination.
+* Paraphrased contamination.
+* Translated contamination.
+* Solution or rationale leakage.
+* Conceptual overlap that may be legitimate training.
+
+### Follow-up questions
+
+* What would you do when contamination is discovered only after training?
+* How would you validate that your decontamination pipeline is not deleting large amounts of useful data?
+
+### Study
+
+* **Evaluation Data Contamination in LLMs: How Do We Measure It and When Does It Matter?**
+* **Tulu 3** — practical training-data decontamination.
+* **Topics:** N-gram matching, MinHash, embedding similarity, benchmark canaries and dynamic private evaluations.
+
+---
+
+## Q3. Aggregate benchmark scores improve, but users report that the model is less useful. How would you find the regression?
+
+Discuss:
+
+* Capability and user-intent slices.
+* Language and geography.
+* Answer length.
+* Refusal behaviour.
+* Factuality.
+* Tool use.
+* Multi-turn interactions.
+* Model-versus-serving-stack regressions.
+* LLM-judge bias.
+* Differences between benchmark prompts and real traffic.
+
+### Study
+
+* **Length-Controlled AlpacaEval: A Simple Way to Debias Automatic Evaluators.**
+* **Tulu 3** — capability-specific and unseen evaluation.
+* **Topics:** Paired regression sets, length-controlled judging, production-aligned evaluations, canary launches and rollback criteria.
+
+---
+
+# Recommended Reading Order
+
+1. **The Llama 3 Herd of Models**
+2. **Tulu 3**
+3. **Direct Preference Optimization**
+4. **KTO** and **SimPO**
+5. **DeepSeek-R1**
+6. **DAPO**
+7. **Does Reinforcement Learning Really Incentivize Reasoning Capacity Beyond the Base Model?**
+8. **DoReMi**
+9. **YaRN** or another strong long-context training paper
+10. **Model Soups**, **Task Arithmetic** and **TIES-Merging**
+11. **IFEval**
+12. **Length-Controlled AlpacaEval**
+
+# Practical Preparation Advice
+
+For every major topic, the candidate should be able to discuss:
+
+* One training recipe.
+* One important failure mode.
+* One debugging methodology.
+* One systems constraint.
+* One unresolved research question.
+
+A strong senior or staff-level answer should usually move through:
+
+**objective → available data → training method → infrastructure → measurements → likely failures → experiment design → decision criteria**
+
+The goal is not to memorise every recent acronym. It is to show that you can reason about how an entire post-training programme should be designed and improved.
+
 
 
 ## Contributions
